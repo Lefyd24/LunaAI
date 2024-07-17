@@ -1,0 +1,11 @@
+chroma_db
+.venv
+__pycache__
+.env
+chat_history.json
+reranked_docs.json
+response.txt
+retrieved_docs.txt
+test_myrag.ipynb
+RAG_AI.ipynb
+uploads

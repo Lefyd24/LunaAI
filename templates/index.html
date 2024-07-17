@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Luna A.I.{% endblock %}
+
+{% block content %}
+<div class="sidebar">
+    <h2 class="text-center">Luna A.I.</h2>
+    <h3 class="text-center">Conversations</h3>
+    <ul id="conversations-list">
+        <li value="new_conversation" style="background-color:#1ea295">
+            <span class="material-symbols-rounded">add</span> <span>New Conversation</span>
+        </li>
+    </ul>
+</div>
+<div class="main-container">
+    <div class="channel-dropdown">
+        <span id="channel-dropdown-text" class="channel-dropdown-text">Change Channel</span>
+        <div class="vertical-divider"></div>
+        <select id="channel-select" class="channel-select"></select>
+    </div>
+    <div class="chat-container"></div>
+    <div class="typing-container">
+        <div class="typing-files">
+            <div id="file-list" style="display: none;"></div>
+            <button id="upload-files-btn" style="display: none;">Upload Files</button>
+        </div>
+        <div class="typing-content">
+            <div class="typing-textarea">
+                <div class="checkbox-container">
+                    <label for="internet-search-checkbox" class="checkbox-label">Search the internet</label>
+                    <input id="internet-search-checkbox" type="checkbox" name="internet-search" value="internet-search" class="checkbox-input">
+                </div>
+                <textarea id="chat-input" spellcheck="false" placeholder="Enter a prompt here" required></textarea>
+                <span id="send-btn" class="material-symbols-rounded">send</span>
+            </div>
+            <div class="typing-controls">
+                <span id="theme-btn" class="material-symbols-rounded">light_mode</span>
+                <span id="delete-btn" class="material-symbols-rounded">delete</span>
+                <span id="file-upload-btn" class="material-symbols-rounded">attach_file</span>
+            </div>
+        </div>
+    </div>
+</div>
+<input type="file" id="file-input" multiple style="display: none;">
+<div id="loading-spinner" class="spinner" style="display: none;">
+    <div class="spinner-content">
+        <div class="loader-ai-name">Luna A.I.</div>
+        <div class="loader-text">Loading the documents in memory...</div>
+    </div>
+</div>
+{% endblock %}
