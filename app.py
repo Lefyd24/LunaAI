@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template, redirect, send_from_directory, url_for
 import os
 import json
-from rag import MyRAGModel
+from rag import get_model_version  
 from flask_socketio import SocketIO, join_room, leave_room, send, emit
 import datetime as dt
 from uuid import uuid4
@@ -14,7 +14,8 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 socketio = SocketIO(app)
 CHAT_HISTORY_FILE = 'chat_history.json'
 
-ragmodel = MyRAGModel()
+ragmodel = get_model_version("config.yml", "CohereModels", "luna-1")
+print(ragmodel)
 # Load existing chat history from JSON file or initialize an empty dictionary
 if os.path.exists(CHAT_HISTORY_FILE):
     with open(CHAT_HISTORY_FILE, 'r') as file:
@@ -100,7 +101,7 @@ def handle_message(data):
 
     response_chunks = ragmodel.generate_stream_response(query=msg, search_web=internet_search)
 
-    with open('response.txt', 'a') as file:
+    with open('response.txt', 'a', encoding='utf-8') as file:
         sources = None
         first_chunk = True
         for chunk in response_chunks:
@@ -227,4 +228,4 @@ def get_conversations(username):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, port=5050)

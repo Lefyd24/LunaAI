@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedRoom = room.charAt(0).toUpperCase() + room.slice(1);
         document.title = `Luna A.I. - ${formattedRoom}`;
         const defaultText = `<div class="default-text">
-                                <h1>Luna A.I.</h1>
+                                <img src="static/svgs/luna-ai-high-resolution-logo-transparent.svg" alt="logo" width="200px">
                                 <p>You are currently in the room: <strong>${formattedRoom}</strong></p>
                                 <p>Start a conversation and explore the power of AI.<br> Your chat history will be displayed here.</p>
                             </div>`;

@@ -1,4 +1,5 @@
 import os
+import yaml
 import cohere
 from cohere.errors import BadRequestError
 import time
@@ -15,6 +16,8 @@ from langchain_cohere import CohereEmbeddings
 from dotenv import load_dotenv
 import json
 from copy import copy
+from pydantic import parse
+
 
 load_dotenv()
 
@@ -34,19 +37,26 @@ def clean_text(text:str):
 
     return text
 
+
+
 class MyRAGModel:
 
 
-    def __init__(self, topic=None):
-        self.CHANNELS = ['general','vrp', 'python']
+    def __init__(self, topic, config, yaml_file=None, model_family=None):
+        self.yaml_file = yaml_file
+        self.model_family = model_family
+        self.model_name = config.get('model_name')
+        self.CHANNELS = config.get('channels')
 
-        self.rerank_model = 'rerank-multilingual-v3.0'
-        self.chat_model = "command-r-plus" 
-        self.COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-        self.embedder = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=0)
-        self.chroma_persistent_client = chromadb.PersistentClient(path="./chroma_db")
+        self.rerank_model = config.get('rerank_model')
+        self.chat_model = config['chat_model']
+        self.COHERE_API_KEY = config.get('cohere_api_key').format(COHERE_API_KEY=os.getenv("COHERE_API_KEY")) if config.get('cohere_api_key') else None
+        
+        self.embedder = self._initialize_component(config['embedder'])
+        self.text_splitter = self._initialize_component(config['text_splitter'])
+        
+        self.vector_db_path = config.get("vector_db_path")
+        self.chroma_persistent_client = chromadb.PersistentClient(path=self.vector_db_path)
 
         self.collection = None
         self.user = None
@@ -56,26 +66,12 @@ class MyRAGModel:
         else:
             self.collection_name = f"{topic}Collection"
             self.collection = self.chroma_persistent_client.get_or_create_collection(self.collection_name)
-            self.vectorstore = Chroma(persist_directory="./chroma_db", collection_name=self.collection_name, embedding_function=self.embedder)
+            self.vectorstore = Chroma(persist_directory=self.vector_db_path, collection_name=self.collection_name, embedding_function=self.embedder)
             print("Vectorstore loaded!")
             self.retriever = self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 20})
 
         self.co = cohere.Client(self.COHERE_API_KEY)
-        self.prompt = """
-        You are a conversational A.I. assistant named "Luna". 
-        {expertise}\n
-        Your purpose is to answer user queries based on the context provided.\n
-        Answer to what you are asked as detailed as possible. Answer only in an HTML format and no other format.\n
-        All your answers should be casted in a well formated HTML syntax, however you don't need to include the initial <html>, <body> and <head> tags.\n
-        You should provide your answer inside a <p> tag. If the user asks for sources, also provide the links in <a> tags.\n
-        If you need to add a title to your answer, use a <h1> or <h2> tag.\n
-        Use <ul> and <li> tags for lists or bullet point, <b> tag for bold text, <i> tag for italic text and <a> tags for links.\n 
-        Your answer must be at least 100 words long.\n
-        Do not use any Markdown syntax or hashtags.\n
-        If you don't know the answer, say that you don't have enough information to answer the question and don't improvise.\n
-
-        User Question: {query}\n
-        """
+        self.prompt = config.get('prompt')
         self.original_prompt = copy(self.prompt)
         self.chat_history = []
         """
@@ -84,9 +80,33 @@ class MyRAGModel:
                     {"role": "CHATBOT", "text": "Hey Michael! How can I help you today?"},
                 ]
         """
+    
+    def __str__(self):
+        return f"Running RAG model: {self.model_name} with vectorstore: {self.vector_db_path}"
+    
+    def _initialize_component(self, component_config):
+        component_class = globals()[component_config['class']]
+        return component_class(**component_config['params'])
 
+    def _update_yaml(self, channel):
+        # Load the YAML file
+        with open(self.yaml_file, 'r') as file:
+            data = yaml.safe_load(file)
+        # Ensure we are working with the correct dictionary structure
+        model_config = data['models'][self.model_family][self.model_name]        
+        # Update the channels in the YAML file
+        model_config['channels'].append(channel)        
+        # Write the updated YAML file
+        with open(self.yaml_file, 'w') as file:
+            yaml.dump(data, file, default_flow_style=False)
+
+
+        
     def add_channel(self, channel):
-        self.CHANNELS.append(channel)
+        # Add the channel to the list in the class
+        if channel not in self.CHANNELS:
+            self.CHANNELS.append(channel)
+            self._update_yaml(channel)
         self.set_topic(channel)
 
     def set_topic(self, topic):
@@ -103,7 +123,7 @@ class MyRAGModel:
             self.prompt = self.original_prompt.format(expertise="", query="{query}")
         self.collection_name = f"{topic}Collection"
         self.collection = self.chroma_persistent_client.get_or_create_collection(self.collection_name)
-        self.vectorstore = Chroma(persist_directory="./chroma_db", collection_name=self.collection_name, embedding_function=self.embedder)
+        self.vectorstore = Chroma(persist_directory=self.vector_db_path, collection_name=self.collection_name, embedding_function=self.embedder)
         self.retriever = self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 20})
         
     def set_user(self, user):
@@ -138,7 +158,7 @@ class MyRAGModel:
             print(f"Creating collection for topic {self.topic}...")
             self.collection_name = f"{self.topic}Collection"
             self.collection = self.chroma_persistent_client.get_or_create_collection(self.collection_name)
-            self.vectorstore = Chroma.from_documents(documents=splitted_document, embedding=self.embedder, persist_directory="./chroma_db", collection_name=f"{self.topic}Collection")
+            self.vectorstore = Chroma.from_documents(documents=splitted_document, embedding=self.embedder, persist_directory=self.vector_db_path, collection_name=f"{self.topic}Collection")
             self.retriever = self.vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 20})
         else:
             self.vectorstore.add_documents(splitted_document)
@@ -148,7 +168,7 @@ class MyRAGModel:
     def retrieve_documents(self, query):
         if self.vectorstore:
             docs = self.retriever.invoke(query)
-            with open("retrieved_docs.txt", "w") as f:
+            with open("retrieved_docs.txt", "w", encoding="utf-8") as f:
                 for doc in docs:
                     f.write(f"{doc.metadata}\n")
                     f.write(f"{doc.page_content}\n")
@@ -254,4 +274,21 @@ class MyRAGModel:
 
 
         self.update_chat_history("CHATBOT", whole_answer)
+
+
+def my_rag_model_constructor(loader, node):
+    return loader.construct_mapping(node, deep=True)
         
+yaml.add_constructor('!LunaModel', my_rag_model_constructor, Loader=yaml.FullLoader)
+yaml.add_constructor('!LunaModel', my_rag_model_constructor, Loader=yaml.SafeLoader)
+
+def load_model_from_yaml(yaml_file, model_family, model_version):
+    with open(yaml_file, 'r') as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    # Return the model configuration dictionary instead of an instance of MyRAGModel
+    return config['models'][model_family][model_version]
+
+# Functions to import and use in another script
+def get_model_version(yaml_file, model_family, model_version) -> MyRAGModel:
+    config = load_model_from_yaml(yaml_file, model_family, model_version)
+    return MyRAGModel(topic=config.get('topic'), config=config, yaml_file=yaml_file, model_family=model_family)
