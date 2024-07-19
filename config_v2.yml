@@ -1,0 +1,37 @@
+LLM_MODELS:
+  CohereModels:
+    luna-1-cohere:
+      llm: !Class
+        class: ChatCohere
+        params:
+          model: command-r-plus
+          temperature: 0.4
+          streaming: true
+
+  OllamaModels:
+    luna-1-mistral:
+      llm: !Class
+        class: Ollama
+        params:
+          model: mistral  
+          temperature: 0.4
+          keep_alive: true
+
+VECTORSTORES:
+  Chroma: !Class
+    class: Chroma
+    params:
+      persist_directory: ./chroma_db
+      collection_name: default
+      create_collection_if_not_exists: true
+      embedding_function: !Class
+        class: HuggingFaceEmbeddings
+        params:
+          model_name: sentence-transformers/all-MiniLM-L6-v2
+    as_retriever: 
+      method: as_retriever
+      args:
+        search_type: similarity
+      kwargs:
+        search_kwargs: {k: 5}
+        

@@ -16,7 +16,6 @@ from langchain_cohere import CohereEmbeddings
 from dotenv import load_dotenv
 import json
 from copy import copy
-from pydantic import parse
 
 
 load_dotenv()
